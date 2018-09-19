@@ -18,7 +18,7 @@ while(True):
         if M['m00'] > 0:
             cX = int((M["m10"] / M["m00"]))
             cY = int((M["m01"] / M["m00"]))
-            print(shape, cX, cY)
+            print(dict(shape=shape, x=cX, y=cY))
             cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
             cv2.putText(frame, shape, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
             0.5, (255, 255, 255), 2)
