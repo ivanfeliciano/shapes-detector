@@ -130,8 +130,6 @@ class ObjectDetectionTensorflow(object):
                 feed_dict={image_tensor: image_np_expanded})
             response = self.create_response(image, np.squeeze(boxes), np.squeeze(classes),
                                             np.squeeze(scores))
-            if response:
-                return response
-            return None
+            return response
         except Exception as error:
             return dict(OurFault="Can not make the object detection processing " + str(error))
