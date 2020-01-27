@@ -29,7 +29,7 @@ class ObjectDetectionTensorflow(object):
         """El constructor se encarga de cargar el modelo de Tensorflow en la
         memoria, a partir del archivo ``frozen_inference_graph.pb``.
         """
-        self.model_name = 'ssd_mobilenet_v1_coco_2018_01_28/saved_model'
+        self.model_name = 'ssd_mobilenet_v2_coco_2018_03_29/saved_model'
         self.model = tf.saved_model.load(self.model_name)
         self.model = self.model.signatures['serving_default']
 
@@ -86,7 +86,6 @@ class ObjectDetectionTensorflow(object):
                                          topLeftX=top_left_x, topLeftY=top_left_y, height=_height, width=_width))
         if len(detected_objects) > 0:
             response = detected_objects
-        print(response)
         return response
         
 
@@ -119,8 +118,6 @@ class ObjectDetectionTensorflow(object):
             scores = output_dict['detection_scores']
             classes = output_dict['detection_classes']
             num = output_dict['num_detections']
-            # print(output_dict)
-            print(boxes)
             response = self.create_response(image, boxes, classes, scores, num_detections)
             return response
             
