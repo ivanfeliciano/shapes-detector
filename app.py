@@ -9,7 +9,6 @@ while(True):
     results = detect_objects.object_detection(frame)
     if results:
         for _object in results:
-            print(_object)
             _x = int(_object['topLeftX'] )
             _y = int(_object['topLeftY'])
             w = int(_object['width'])

@@ -29,18 +29,11 @@ class ObjectDetectionTensorflow(object):
         """El constructor se encarga de cargar el modelo de Tensorflow en la
         memoria, a partir del archivo ``frozen_inference_graph.pb``.
         """
-        self.model_name = 'ssd_mobilenet_v1_coco_2018_01_28'
-        self.path_to_ckpt = self.model_name + '/frozen_inference_graph.pb'
-        self.detection_graph = tf.Graph()
-        with self.detection_graph.as_default():
-            od_graph_def = tf.GraphDef()
-            with tf.gfile.GFile(self.path_to_ckpt, 'rb') as fid:
-                serialized_graph = fid.read()
-                od_graph_def.ParseFromString(serialized_graph)
-                tf.import_graph_def(od_graph_def, name='')
-            self.sess = tf.Session(graph=self.detection_graph)
+        self.model_name = 'ssd_mobilenet_v1_coco_2018_01_28/saved_model'
+        self.model = tf.saved_model.load(self.model_name)
+        self.model = self.model.signatures['serving_default']
 
-    def create_response(self, image_np, boxes, classes, scores):
+    def create_response(self, image_np, boxes, classes, scores, num_detections):
         """.. :method:: create_response(image_np, classes, scores)
 
         Método que se encarga de convertir en un diccionario el resultado del
@@ -74,28 +67,28 @@ class ObjectDetectionTensorflow(object):
 
 
         """
-
         response = None
         detected_objects = []
-        iterator = 0
+        box_idx = 0
         height, width, layers = image_np.shape
-        while scores[iterator] > 0.5 and iterator < len(scores):
-            (y_min, x_min, y_max, x_max) = (boxes[iterator, 0], boxes[iterator, 1], \
-                                            boxes[iterator, 2], boxes[iterator, 3])
-            category = CATEGORY_INDEX[str(int(classes[iterator]))]['name']
-            confidence = scores[iterator]
+        boxes = boxes[0]
+        for i in range(num_detections):
+            if scores[i] < 0.5:
+                continue
+            y_min, x_min, y_max, x_max = boxes[i]
+            category = CATEGORY_INDEX[str(int(classes[i]))]['name']
+            confidence = scores[i]
             top_left_x = round(x_min * width)
             top_left_y = round(y_min * height)
             _height = round(height * (y_max - y_min))
             _width = round(width * (x_max - x_min))
-
             detected_objects.append(dict(category=category, confidence=float(confidence), \
                                          topLeftX=top_left_x, topLeftY=top_left_y, height=_height, width=_width))
-
-            iterator += 1
         if len(detected_objects) > 0:
             response = detected_objects
+        print(response)
         return response
+        
 
     def object_detection(self, image, is_url=None):
         """.. :method:: object_detection(image, is_url):
@@ -114,22 +107,23 @@ class ObjectDetectionTensorflow(object):
 
         """
         try:
-            # Definite input and output Tensors for self.detection_graph
-            image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
-            # Each box represents a part of the image where a particular object was detected.
-            detection_boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
-            # Each score represent how level of confidence for each of the objects.
-            # Score is shown on the result image, together with the class label.
-            detection_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
-            detection_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
-            num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
-            image_np_expanded = np.expand_dims(image, axis=0)
-            # Actual detection.
-            (boxes, scores, classes, num) = self.sess.run(
-                [detection_boxes, detection_scores, detection_classes, num_detections],
-                feed_dict={image_tensor: image_np_expanded})
-            response = self.create_response(image, np.squeeze(boxes), np.squeeze(classes),
-                                            np.squeeze(scores))
+            image = np.asarray(image)
+            input_tensor = tf.convert_to_tensor(image)
+            input_tensor = input_tensor[tf.newaxis,...]
+            output_dict = self.model(input_tensor)
+            num_detections = int(output_dict.pop('num_detections'))
+            output_dict = {key:value[0, :num_detections].numpy()\
+                            for key,value in output_dict.items()}
+            output_dict['num_detections'] = num_detections
+            boxes = output_dict['detection_boxes'],
+            scores = output_dict['detection_scores']
+            classes = output_dict['detection_classes']
+            num = output_dict['num_detections']
+            # print(output_dict)
+            print(boxes)
+            response = self.create_response(image, boxes, classes, scores, num_detections)
             return response
+            
         except Exception as error:
+            print(error)
             return dict(OurFault="Can not make the object detection processing " + str(error))
